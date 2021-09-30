@@ -1,47 +1,91 @@
 const express = require('express')
 const path = require('path');
+const fs = require('fs')
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-// /(<h4><strong>).*(<\/strong><\/h4><table class=").*("><tbody>).*(<\/tbody><\/table>)*/gm;
-
-//htmlFile = fs.readFileSync(path.join(process.cwd(), 'static', 'index.html'));
-//htmlFile = htmlFile.match(/(<h4><strong>)(.*?)(<\/strong><\/h4><table class="table table-striped prices-table funerals"><tbody>)(.*?)(<\/tbody><\/table>)/gm)
-//htmlFile = htmlFile[0]
-
-
-const url = 'https://www.mailpoet.com/blog/email-testing-tools/'
 const app = express()
 const port = 80
-var recursive = 0
-
 app.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`)
 })
 app.use(express.static('static'))
 
+fs.closeSync(fs.openSync(path.join(process.cwd(), 'static', 'data.txt'), 'w'))
+
+const urlStart = 'https://tl.krakow.pl/'
+var recursive = 0
+var mailArray = []
+var urlArray = []
+
 function extract(text, type) {
-    //const regexUrl = new RegExp("(http|ftp|https)://([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?", 'gm')
     const regexUrl = new RegExp("a .*?href=\"(https?:\/\/[^\#]*?)\"", 'gm')
     const regexMail = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi
-    //const regexMail = new RegExp()
     if (type == 'mail') {
-        return text.match(regexMail);
+        let mails = []
+        try {
+            mails = text.match(regexMail)
+            mails = mails.filter(a => a.slice(-4) != '.png')
+            mails = mails.filter(a => a.split("@").length == 2)
+            mails = mails.filter(a => a.split(".")[a.split(".").length - 1].match(/\d+/g) == null)
+        } catch (error) { }
+        return mails;
     } else if (type == 'url') {
-        return text.match(regexUrl);
+        let urls = []
+        try {
+            urls = text.match(regexUrl).map(url => ('http' + url.split('http')[url.split('http').length - 1]))
+            urls = urls.filter(url => url.split("/").map(a => a[0]).some(a => a == "?") == false)
+            urls = urls.map(url => url.slice(0, -1))
+        } catch (error) { }
+        return urls;
     } else {
         return undefined
     }
 }
 
 function main(text) {
-    console.log(extract(text, 'mail'));
-    console.log(extract(text, 'url'));
+    try {
+        let mails = extract(text, 'mail')
+        let urls = extract(text, 'url')
+        console.log(mails);
+        console.log(urls);
+        mailArray.push(mails)
+        urlArray.push(urls)
+        mails.push('\n')
+        fs.appendFile(path.join(process.cwd(), 'static', 'data.txt'), mails.join("\n"), function (err) { if (err) { console.error(err); return; } })
+        let flag = true
+        let i = 0
+        let checker = 0
+        while (flag) {
+            if (urls[i] != undefined && checker < 10) {
+                if (recursive >= 1001) {
+                    // fs.readFile(path.join(process.cwd(), 'static', 'data.txt'), 'utf8', (err, data) => {
+                    //     if (err) { console.error(err); return }
+                    //     fs.writeFile(path.join(process.cwd(), 'static', 'data.txt'), data.replace(/^\s*\n/gm), err => {if (err) {console.error(err);return}})
+                    // })
+                    console.log(finished)
+                    return
+                }
+                rekurencja(urls[i])
+                i++
+                checker++
+            } else {
+                flag = false
+            }
+        }
+    } catch (error) { }
 }
 
-fetch(url)
-    .then(function (response) {
-        //console.log(response.headers.get("content-type"))
-        return response.text();
-    })
-    .then(function (text) {
-        main(text)
-    });
+function rekurencja(url) {
+    try {
+        recursive++
+        fetch(url)
+            .then(function (response) {
+                //console.log(response.headers.get("content-type"))
+                return response.text();
+            })
+            .then(function (text) {
+                main(text)
+            });
+    } catch (error) {}
+}
+
+rekurencja(urlStart)
