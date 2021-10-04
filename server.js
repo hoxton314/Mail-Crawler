@@ -10,12 +10,13 @@ app.listen(port, () => {
 app.use(express.static('static'))
 
 fs.closeSync(fs.openSync(path.join(process.cwd(), 'static', 'data.txt'), 'w'))
+fs.closeSync(fs.openSync(path.join(process.cwd(), 'static', 'urls.txt'), 'w'))
 
 const urlStart = 'https://tl.krakow.pl/'
 var recursive = 0
 var mailArray = []
 var urlArray = []
-
+var timestamp = (new Date()).getTime()
 function extract(text, type) {
     const regexUrl = new RegExp("a .*?href=\"(https?:\/\/[^\#]*?)\"", 'gm')
     const regexMail = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi
@@ -42,6 +43,10 @@ function extract(text, type) {
 }
 
 function main(text) {
+    // if (recursive >= 1001) {
+    //     console.log("================finished=============")
+    //     process.exit()
+    // }
     try {
         let mails = extract(text, 'mail')
         let urls = extract(text, 'url')
@@ -51,22 +56,24 @@ function main(text) {
         urlArray.push(urls)
         mails.push('\n')
         fs.appendFile(path.join(process.cwd(), 'static', 'data.txt'), mails.join("\n"), function (err) { if (err) { console.error(err); return; } })
+        fs.appendFile(path.join(process.cwd(), 'static', 'urls.txt'), urls.join("\n"), function (err) { if (err) { console.error(err); return; } })
         let flag = true
         let i = 0
         let checker = 0
         while (flag) {
             if (urls[i] != undefined && checker < 10) {
                 if (recursive >= 1001) {
-                    // fs.readFile(path.join(process.cwd(), 'static', 'data.txt'), 'utf8', (err, data) => {
-                    //     if (err) { console.error(err); return }
-                    //     fs.writeFile(path.join(process.cwd(), 'static', 'data.txt'), data.replace(/^\s*\n/gm), err => {if (err) {console.error(err);return}})
-                    // })
-                    console.log(finished)
-                    return
+                    console.log("================finished=============")
+                    console.log(timestamp)
+                    console.log((new Date()).getTime())
+                    console.log((new Date()).getTime() - timestamp)
+                    process.exit()
+                } else {
+                    rekurencja(urls[i])
+                    i++
+                    checker++
                 }
-                rekurencja(urls[i])
-                i++
-                checker++
+
             } else {
                 flag = false
             }
@@ -84,8 +91,11 @@ function rekurencja(url) {
             })
             .then(function (text) {
                 main(text)
+            })
+            .catch((error) => {
+                console.error('Error url');
             });
-    } catch (error) {}
+    } catch (error) { }
 }
 
 rekurencja(urlStart)
